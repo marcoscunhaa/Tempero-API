@@ -12,6 +12,6 @@ export default `<!doctype html>
 </script>
   <app-root></app-root>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<link rel="modulepreload" href="chunk-RYZJFD6C.js"><link rel="modulepreload" href="chunk-O24U6QX5.js"><script src="polyfills-5CFQRCPP.js" type="module"></script><script src="main-SKO3XQEG.js" type="module"></script></body>
+<link rel="modulepreload" href="chunk-RYZJFD6C.js"><link rel="modulepreload" href="chunk-O24U6QX5.js"><script src="polyfills-5CFQRCPP.js" type="module"></script><script src="main-FAJGSC2L.js" type="module"></script></body>
 </html>
 `;
