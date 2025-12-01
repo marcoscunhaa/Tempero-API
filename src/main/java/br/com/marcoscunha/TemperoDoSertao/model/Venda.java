@@ -43,16 +43,17 @@ public class Venda {
     @Column(nullable = false)
     private String formaPagamento;
 
+    // NOVO CAMPO
+    @Column(nullable = false)
+    private BigDecimal lucro;
+
     @PrePersist
     public void prePersist() {
         if (dataVenda == null) {
-            dataVenda = LocalDate.now();  // Garante data automática
+            dataVenda = LocalDate.now(); // Apenas define a data se não vier
         }
-    }
-
-    public BigDecimal getLucro() {
-        return precoVenda
-                .subtract(precoCompra)
-                .multiply(BigDecimal.valueOf(quantidadeVendida));
+        if (lucro == null) {
+            lucro = BigDecimal.ZERO; // Garante que não seja null
+        }
     }
 }

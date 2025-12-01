@@ -35,19 +35,18 @@ public class VendaService {
     }
 
     public Venda salvarVenda(Venda venda) {
-
         if (venda.getFormaPagamento() == null || venda.getFormaPagamento().isBlank()) {
             throw new RuntimeException("Forma de pagamento é obrigatória.");
         }
-        venda.setFormaPagamento(venda.getFormaPagamento().trim().toUpperCase());
-        Produto produto = produtoRepository.findByDetalheIgnoreCase(venda.getProduto());
 
+        venda.setFormaPagamento(venda.getFormaPagamento().trim().toUpperCase());
+
+        Produto produto = produtoRepository.findByDetalheIgnoreCase(venda.getProduto());
         if (produto == null) {
             throw new RuntimeException("Produto não encontrado: " + venda.getProduto());
         }
 
         int quantidade = venda.getQuantidadeVendida();
-
         if (quantidade <= 0) {
             throw new RuntimeException("Quantidade vendida inválida");
         }
@@ -56,13 +55,25 @@ public class VendaService {
             throw new RuntimeException("Estoque insuficiente para esta venda");
         }
 
+        // Atualiza estoque
         produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - quantidade);
         produtoRepository.save(produto);
 
+        // Define valores antes de salvar
         venda.setPrecoCompra(produto.getPrecoCompra());
-        venda.setDataVenda(LocalDate.now());
+        if (venda.getDataVenda() == null) {
+            venda.setDataVenda(LocalDate.now());
+        }
+
+        // **Salva o lucro enviado pelo frontend, sem recalcular**
+        if (venda.getLucro() == null) {
+            venda.setLucro(BigDecimal.ZERO);
+        }
+
         return vendaRepository.save(venda);
     }
+
+
 
     public void deletarVenda(Long id) {
         vendaRepository.deleteById(id);
@@ -72,16 +83,17 @@ public class VendaService {
         List<Venda> vendas = vendaRepository.findAll();
 
         BigDecimal totalVendido = vendas.stream()
-                .map(v -> v.getPrecoVenda()
-                        .multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
+                .map(v -> v.getPrecoVenda().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalComprado = vendas.stream()
-                .map(v -> v.getPrecoCompra()
-                        .multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
+                .map(v -> v.getPrecoCompra().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal lucroBruto = totalVendido.subtract(totalComprado);
+        // Usa o campo lucro da entidade
+        BigDecimal lucroBruto = vendas.stream()
+                .map(Venda::getLucro)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         double margemLucro = totalVendido.compareTo(BigDecimal.ZERO) == 0
                 ? 0.0
