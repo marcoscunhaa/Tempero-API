@@ -11,31 +11,51 @@ import java.util.List;
 @RestController
 @RequestMapping("/vendas")
 public class VendaController {
+
     private final VendaService vendaService;
 
     public VendaController(VendaService vendaService) {
         this.vendaService = vendaService;
     }
 
+    // ============================
+    // LISTAR TODAS AS VENDAS
+    // ============================
     @GetMapping
-    public List<Venda> listarVendas(@RequestParam(defaultValue = "todas") String categoria) {
-        return vendaService.listarPorCategoria(categoria);
+    public ResponseEntity<List<Venda>> listarVendas() {
+        return ResponseEntity.ok(vendaService.listarTodasVendas());
     }
 
+    // ============================
+    // CRIAR VENDA COM ITENS
+    // ============================
     @PostMapping
     public ResponseEntity<Venda> criarVenda(@RequestBody Venda venda) {
-        Venda vendaSalva = vendaService.salvarVenda(venda);
-        return ResponseEntity.ok(vendaSalva);
+        return ResponseEntity.ok(vendaService.salvarVenda(venda));
     }
 
+    // ============================
+    // ATUALIZAR VENDA
+    // ============================
+    @PutMapping("/{id}")
+    public ResponseEntity<Venda> atualizarVenda(@PathVariable Long id, @RequestBody Venda venda) {
+        return ResponseEntity.ok(vendaService.atualizarVenda(id, venda));
+    }
+
+    // ============================
+    // DELETAR VENDA (REPOR ESTOQUE)
+    // ============================
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarVenda(@PathVariable Long id) {
         vendaService.deletarVenda(id);
         return ResponseEntity.noContent().build();
     }
 
+    // ============================
+    // RESUMO DAS VENDAS
+    // ============================
     @GetMapping("/resumo")
-    public ResumoVendasDTO getResumoVendas() {
-        return vendaService.resumoVendas();
+    public ResponseEntity<ResumoVendasDTO> getResumoVendas() {
+        return ResponseEntity.ok(vendaService.resumoVendas());
     }
 }
