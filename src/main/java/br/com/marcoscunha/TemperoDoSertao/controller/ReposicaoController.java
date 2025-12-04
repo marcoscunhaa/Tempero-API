@@ -73,4 +73,27 @@ public class ReposicaoController {
         reposicaoService.deletar(id);
         return ResponseEntity.noContent().build();
     }
+
+    // Atualizar/editar reposição
+    @PutMapping("/{id}")
+    public ResponseEntity<?> editarReposicao(@PathVariable Long id, @RequestBody Reposicao reposicaoAtualizada) {
+        try {
+            // Se o produto foi enviado, verificar se existe
+            if (reposicaoAtualizada.getProduto() != null && reposicaoAtualizada.getProduto().getId() != null) {
+                Optional<Produto> produtoOpt = produtoService.buscarPorId(reposicaoAtualizada.getProduto().getId());
+                if (produtoOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body("Produto não encontrado!");
+                }
+                reposicaoAtualizada.setProduto(produtoOpt.get());
+            }
+
+            Reposicao reposicaoEditada = reposicaoService.editarReposicao(id, reposicaoAtualizada);
+            return ResponseEntity.ok(reposicaoEditada);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Erro ao atualizar a reposição.");
+        }
+    }
+
 }

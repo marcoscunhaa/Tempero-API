@@ -60,4 +60,34 @@ public class ReposicaoService {
             reposicaoRepository.deleteById(id);
         });
     }
+
+    // Editar/atualizar reposição
+    public Reposicao editarReposicao(Long id, Reposicao reposicaoAtualizada) {
+        Optional<Reposicao> reposicaoExistenteOpt = reposicaoRepository.findById(id);
+
+        if (reposicaoExistenteOpt.isPresent()) {
+            Reposicao reposicaoExistente = reposicaoExistenteOpt.get();
+
+            // Ajustar estoque: subtrair quantidade antiga e adicionar quantidade nova
+            Produto produto = reposicaoExistente.getProduto();
+            int quantidadeAnterior = reposicaoExistente.getQuantidade();
+            int diferencaQuantidade = reposicaoAtualizada.getQuantidade() - quantidadeAnterior;
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + diferencaQuantidade);
+
+            // Atualizar campos da reposição
+            reposicaoExistente.setQuantidade(reposicaoAtualizada.getQuantidade());
+            reposicaoExistente.setVencimento(reposicaoAtualizada.getVencimento());
+            reposicaoExistente.setDataEntrada(reposicaoAtualizada.getDataEntrada());
+            reposicaoExistente.setPrecoCompra(reposicaoAtualizada.getPrecoCompra());
+            reposicaoExistente.setPrecoVenda(reposicaoAtualizada.getPrecoVenda());
+            reposicaoExistente.setProduto(reposicaoAtualizada.getProduto()); // se quiser permitir trocar de produto
+
+            // Salvar alterações
+            produtoRepository.save(produto);
+            return reposicaoRepository.save(reposicaoExistente);
+        } else {
+            throw new RuntimeException("Reposição com id " + id + " não encontrada.");
+        }
+    }
+
 }
