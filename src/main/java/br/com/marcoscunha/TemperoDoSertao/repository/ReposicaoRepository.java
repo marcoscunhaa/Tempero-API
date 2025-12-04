@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ReposicaoRepository extends JpaRepository<Reposicao, Long> {
@@ -14,4 +15,7 @@ public interface ReposicaoRepository extends JpaRepository<Reposicao, Long> {
 
     // opcional: buscar lotes vencendo antes de uma data
     List<Reposicao> findByVencimentoBefore(java.time.LocalDate data);
+
+    Optional<Reposicao> findTopByProdutoOrderByDataEntradaDesc(Produto produto);
+    Optional<Reposicao> findTopByProdutoIdOrderByDataEntradaDesc(Long produtoId);
 }

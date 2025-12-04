@@ -2,8 +2,10 @@ package br.com.marcoscunha.TemperoDoSertao.service;
 
 import br.com.marcoscunha.TemperoDoSertao.dto.ResumoVendasDTO;
 import br.com.marcoscunha.TemperoDoSertao.model.Produto;
+import br.com.marcoscunha.TemperoDoSertao.model.Reposicao;
 import br.com.marcoscunha.TemperoDoSertao.model.Venda;
 import br.com.marcoscunha.TemperoDoSertao.repository.ProdutoRepository;
+import br.com.marcoscunha.TemperoDoSertao.repository.ReposicaoRepository;
 import br.com.marcoscunha.TemperoDoSertao.repository.VendaRepository;
 import org.springframework.stereotype.Service;
 
@@ -11,17 +13,21 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class VendaService {
 
     private final VendaRepository vendaRepository;
     private final ProdutoRepository produtoRepository;
+    private final ReposicaoRepository reposicaoRepository;
 
     public VendaService(VendaRepository vendaRepository,
-                        ProdutoRepository produtoRepository) {
+                        ProdutoRepository produtoRepository,
+                        ReposicaoRepository reposicaoRepository) {
         this.vendaRepository = vendaRepository;
         this.produtoRepository = produtoRepository;
+        this.reposicaoRepository = reposicaoRepository;
     }
 
     // ============================
@@ -46,37 +52,51 @@ public class VendaService {
         if (venda.getFormaPagamento() == null || venda.getFormaPagamento().isBlank()) {
             throw new RuntimeException("Forma de pagamento é obrigatória.");
         }
-
         venda.setFormaPagamento(venda.getFormaPagamento().trim().toUpperCase());
 
+        // Buscar produto no banco
         Produto produto = buscarProduto(venda.getProduto());
 
-        int quantidade = venda.getQuantidadeVendida();
-        if (quantidade <= 0) {
+        int quantidadeVendida = venda.getQuantidadeVendida();
+        if (quantidadeVendida <= 0) {
             throw new RuntimeException("Quantidade vendida inválida.");
         }
 
-        if (produto.getQuantidadeEstoque() < quantidade) {
+        if (produto.getQuantidadeEstoque() < quantidadeVendida) {
             throw new RuntimeException("Estoque insuficiente.");
         }
 
         // Baixa estoque
-        produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - quantidade);
+        produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - quantidadeVendida);
         produtoRepository.save(produto);
 
-        // Preenche valores automáticos
+        // Preenche valores automáticos da venda
         venda.setPrecoCompra(produto.getPrecoCompra());
-
         if (venda.getDataVenda() == null) {
             venda.setDataVenda(LocalDate.now());
         }
-
         if (venda.getLucro() == null) {
             venda.setLucro(BigDecimal.ZERO);
         }
 
-        return vendaRepository.save(venda);
+        Venda vendaSalva = vendaRepository.save(venda);
+
+        // Atualiza produto com os dados do último lote sempre
+        Optional<Reposicao> ultimoLoteOpt = reposicaoRepository.findTopByProdutoIdOrderByDataEntradaDesc(produto.getId());
+
+        if (ultimoLoteOpt.isPresent()) {
+            Reposicao ultimoLote = ultimoLoteOpt.get();
+
+            produto.setPrecoCompra(ultimoLote.getPrecoCompra());
+            produto.setPrecoVenda(ultimoLote.getPrecoVenda());
+            produto.setVencimento(ultimoLote.getVencimento());
+
+            produtoRepository.save(produto);
+        }
+
+        return vendaSalva;
     }
+
 
     // ============================
     // DELETAR VENDA (repor estoque)
@@ -87,17 +107,17 @@ public class VendaService {
 
         Produto produto = buscarProduto(venda.getProduto());
 
-        // Repor estoque
         produto.setQuantidadeEstoque(
                 produto.getQuantidadeEstoque() + venda.getQuantidadeVendida()
         );
+
         produtoRepository.save(produto);
 
         vendaRepository.deleteById(id);
     }
 
     // ============================
-    // EDITAR VENDA (repor → aplicar nova)
+    // EDITAR VENDA
     // ============================
     public Venda atualizarVenda(Long id, Venda vendaAtualizada) {
 
@@ -106,23 +126,24 @@ public class VendaService {
 
         Produto produto = buscarProduto(vendaAtualizada.getProduto());
 
-        // 1️⃣ Repor estoque da venda antiga
+        // Repor estoque antigo
         produto.setQuantidadeEstoque(
                 produto.getQuantidadeEstoque() + vendaExistente.getQuantidadeVendida()
         );
 
-        // 2️⃣ Verificar nova quantidade
+        // Verificar nova quantidade
         if (produto.getQuantidadeEstoque() < vendaAtualizada.getQuantidadeVendida()) {
             throw new RuntimeException("Estoque insuficiente para editar venda.");
         }
 
-        // 3️⃣ Aplicar nova baixa
+        // Aplicar nova baixa
         produto.setQuantidadeEstoque(
                 produto.getQuantidadeEstoque() - vendaAtualizada.getQuantidadeVendida()
         );
+
         produtoRepository.save(produto);
 
-        // 4️⃣ Atualizar campos da venda
+        // Atualizar dados
         vendaExistente.setCategoria(vendaAtualizada.getCategoria());
         vendaExistente.setProduto(vendaAtualizada.getProduto());
         vendaExistente.setMarca(vendaAtualizada.getMarca());
@@ -143,13 +164,11 @@ public class VendaService {
         List<Venda> vendas = vendaRepository.findAll();
 
         BigDecimal totalVendido = vendas.stream()
-                .map(v -> v.getPrecoVenda()
-                        .multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
+                .map(v -> v.getPrecoVenda().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalComprado = vendas.stream()
-                .map(v -> v.getPrecoCompra()
-                        .multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
+                .map(v -> v.getPrecoCompra().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal lucroBruto = vendas.stream()
@@ -165,7 +184,7 @@ public class VendaService {
     }
 
     // ============================
-    // FUNÇÃO AUXILIAR
+    // BUSCAR PRODUTO POR DETALHE
     // ============================
     private Produto buscarProduto(String detalhe) {
         Produto produto = produtoRepository.findByDetalheIgnoreCase(detalhe);
