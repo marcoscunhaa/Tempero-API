@@ -3,7 +3,7 @@
   <dontWrapJar>false</dontWrapJar>
   <headerType>gui</headerType>
   <jar>C:\Users\Atend\Downloads\Tempero-API\target\TemperoDoSertao-0.0.1-SNAPSHOT.jar</jar>
-  <outfile>C:\Users\Atend\Downloads\Tempero-API\TemperoApp.exe</outfile>
+  <outfile>C:\Users\Atend\Downloads\Tempero-API\Tempero.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
   <chdir>.</chdir>
