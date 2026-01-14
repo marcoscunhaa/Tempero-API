@@ -22,103 +22,68 @@ public class ReposicaoService {
         this.produtoRepository = produtoRepository;
     }
 
-    /**
-     * Cria reposição (lote) e reflete imediatamente no produto:
-     * - Soma estoque
-     * - Atualiza preço de VENDA
-     * - Atualiza preço de AQUISIÇÃO
-     * - Vencimento fica apenas no lote
-     */
+    // =========================
+    // CRIAR REPOSIÇÃO
+    // =========================
     @Transactional
     public Reposicao salvarReposicao(Reposicao reposicao) {
 
-        Long produtoId = reposicao.getProduto().getId();
-
-        Produto produto = produtoRepository.findById(produtoId)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+        Produto produto = produtoRepository.findById(
+                reposicao.getProduto().getId()
+        ).orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
         // Estoque
         produto.setQuantidadeEstoque(
                 produto.getQuantidadeEstoque() + reposicao.getQuantidade()
         );
 
-        // Preços (sempre sobrescrevem)
+        // Preços (último lote vence)
         produto.setPrecoVenda(reposicao.getPrecoVenda());
-        produto.setPrecoCompra(reposicao.getPrecoCompra()); // ou precoAquisicao
+        produto.setPrecoCompra(reposicao.getPrecoCompra());
 
         produtoRepository.save(produto);
 
-        // Vínculo correto
         reposicao.setProduto(produto);
-
         return reposicaoRepository.save(reposicao);
     }
 
-    // Listar todas reposições
+    // =========================
+    // LISTAGENS
+    // =========================
     public List<Reposicao> listarTodos() {
         return reposicaoRepository.findAll();
     }
 
-    // Buscar por produto
-    public List<Reposicao> buscarPorProduto(Produto produto) {
-        return reposicaoRepository.findByProduto(produto);
-    }
-
-    // Buscar por ID
     public Optional<Reposicao> buscarPorId(Long id) {
         return reposicaoRepository.findById(id);
     }
 
-    /**
-     * Deleta reposição:
-     * - Ajusta apenas estoque
-     * - NÃO altera preços
-     */
-    @Transactional
-    public void deletar(Long id) {
-
-        Reposicao reposicao = reposicaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reposição não encontrada"));
-
-        Produto produto = produtoRepository.findById(
-                reposicao.getProduto().getId()
-        ).orElseThrow(() -> new RuntimeException("Produto não encontrado"));
-
-        produto.setQuantidadeEstoque(
-                produto.getQuantidadeEstoque() - reposicao.getQuantidade()
-        );
-
-        produtoRepository.save(produto);
-        reposicaoRepository.delete(reposicao);
+    public List<Reposicao> buscarPorProduto(Produto produto) {
+        return reposicaoRepository.findByProduto(produto);
     }
 
-    /**
-     * Edita reposição:
-     * - Ajusta estoque pela diferença
-     * - Atualiza preço de VENDA
-     * - Atualiza preço de AQUISIÇÃO
-     */
+    // =========================
+    // EDITAR REPOSIÇÃO
+    // =========================
     @Transactional
     public Reposicao editarReposicao(Long id, Reposicao reposicaoAtualizada) {
 
         Reposicao reposicaoExistente = reposicaoRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Reposição com id " + id + " não encontrada.")
-                );
+                .orElseThrow(() -> new RuntimeException("Reposição não encontrada"));
 
         Produto produto = produtoRepository.findById(
                 reposicaoExistente.getProduto().getId()
         ).orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-        // Estoque
-        int quantidadeAnterior = reposicaoExistente.getQuantidade();
-        int diferenca = reposicaoAtualizada.getQuantidade() - quantidadeAnterior;
+        // Ajuste de estoque
+        int diferenca = reposicaoAtualizada.getQuantidade()
+                - reposicaoExistente.getQuantidade();
 
         produto.setQuantidadeEstoque(
                 produto.getQuantidadeEstoque() + diferenca
         );
 
-        // Preços
+        // Atualiza preços
         produto.setPrecoVenda(reposicaoAtualizada.getPrecoVenda());
         produto.setPrecoCompra(reposicaoAtualizada.getPrecoCompra());
 
@@ -131,5 +96,42 @@ public class ReposicaoService {
 
         produtoRepository.save(produto);
         return reposicaoRepository.save(reposicaoExistente);
+    }
+
+    // =========================
+    // DELETAR REPOSIÇÃO (REVERSO)
+    // =========================
+    @Transactional
+    public void deletar(Long id) {
+
+        Reposicao reposicao = reposicaoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reposição não encontrada"));
+
+        Produto produto = produtoRepository.findById(
+                reposicao.getProduto().getId()
+        ).orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+
+        // 1️⃣ Ajusta estoque
+        produto.setQuantidadeEstoque(
+                produto.getQuantidadeEstoque() - reposicao.getQuantidade()
+        );
+
+        // 2️⃣ Remove o lote
+        reposicaoRepository.delete(reposicao);
+
+        // 3️⃣ Busca lote anterior (novo preço vigente)
+        Optional<Reposicao> ultimaReposicao =
+                reposicaoRepository.findTopByProdutoOrderByDataEntradaDesc(produto);
+
+        if (ultimaReposicao.isPresent()) {
+            produto.setPrecoVenda(ultimaReposicao.get().getPrecoVenda());
+            produto.setPrecoCompra(ultimaReposicao.get().getPrecoCompra());
+        } else {
+            // Se não existir mais lote, você decide a regra:
+            produto.setPrecoVenda(null);
+            produto.setPrecoCompra(null);
+        }
+
+        produtoRepository.save(produto);
     }
 }
