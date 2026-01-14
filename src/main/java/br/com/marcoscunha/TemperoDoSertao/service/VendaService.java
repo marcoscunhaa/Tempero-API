@@ -162,14 +162,23 @@ public class VendaService {
     // ============================
     public ResumoVendasDTO resumoVendas() {
         List<Venda> vendas = vendaRepository.findAll();
+        List<Reposicao> reposicoes = reposicaoRepository.findAll();
 
         BigDecimal totalVendido = vendas.stream()
                 .map(v -> v.getPrecoVenda().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalComprado = vendas.stream()
-                .map(v -> v.getPrecoCompra().multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
+        BigDecimal totalCompradoVendas = vendas.stream()
+                .map(v -> v.getPrecoCompra()
+                        .multiply(BigDecimal.valueOf(v.getQuantidadeVendida())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalCompradoReposicoes = reposicoes.stream()
+                .map(r -> r.getPrecoCompra()
+                        .multiply(BigDecimal.valueOf(r.getQuantidade())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalComprado = totalCompradoVendas.add(totalCompradoReposicoes);
 
         BigDecimal lucroBruto = vendas.stream()
                 .map(Venda::getLucro)
